@@ -1,6 +1,5 @@
 import os
 import re
-import wget
 import requests
 import subprocess
 from lxml import etree
@@ -118,11 +117,9 @@ class GetUrl(object):
         p.close()
         return str(token)
 
-    # 获取分类url列表
     def get_list(self):
         return self.url_list
 
-    # 去重
     def rd_list(self):
         temp = list(set(self.url_list))
         temp.sort(key=self.url_list.index)
