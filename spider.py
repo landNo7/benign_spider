@@ -41,8 +41,8 @@ class GetUrl(object):
         self.xpath_temp_exe_link = '//*[@id="local_0"]/a[1]/@tempurl'
         self.page = requests.session()
         self.page.mount('https://', HTTPAdapter(max_retries=3))
-    def get_url(self, url, status):
 
+    def get_url(self, url, status):
         self.page.headers = header
         p = self.page.get(url, timeout=20)
         print(url + " https status: %s" % p.status_code)
