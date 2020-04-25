@@ -1,6 +1,11 @@
-from lxml import etree
-import requests
+import os
 import re
+import wget
+import requests
+import subprocess
+from lxml import etree
+from requests.adapters import HTTPAdapter
+
 
 header = {
     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,\
@@ -22,22 +27,25 @@ header1 = {
 
 class GetUrl(object):
     def __init__(self):
-        self.get_toekn_head = "https://dlc2.pconline.com.cn/dltoken/"
-        self.get_toekn_end = "_genLink.js"
+        self.dir_path = 'install_exe/'
+        if not os.path.exists(self.dir_path):
+            os.makedirs(self.dir_path)
+        self.get_token_head = "https://dlc2.pconline.com.cn/dltoken/"
+        self.get_token_end = "_genLink.js"
         self.url_head = "https:"
         self.dowload_url = []
         self.url_list = []
         self.xpath_menu = '//*[@id="Jsort"]/div[2]/ul/li/dl/dt/a/@href'
         self.xpath_dowload = '//*[@id="Jwrap"]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div/div[1]/div/div/div[1]/p/a/@href'
         self.xpath_next_page = '//*[@id="Jwrap"]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div/div[2]/a/@href'
-        self.xpath_temp_exe_link = '//*[@id="local_0"]/a[1]/@href'
-
+        self.xpath_temp_exe_link = '//*[@id="local_0"]/a[1]/@tempurl'
+        self.page = requests.session()
+        self.page.mount('https://', HTTPAdapter(max_retries=3))
     def get_url(self, url, status):
 
-        page = requests.session()
-        page.headers = header
-        p = page.get(url)
-        print("https status: %s" % p.status_code)
+        self.page.headers = header
+        p = self.page.get(url, timeout=20)
+        print(url + " https status: %s" % p.status_code)
         html = etree.HTML(p.text)
         p.close()
         if 0 == status:
@@ -58,22 +66,28 @@ class GetUrl(object):
             self.dowload_url += urls
 
     def get_exe_url(self):
-        page = requests.session()
-        page.headers = header
+        self.page.headers = header
         for url in self.dowload_url:
+            # print(url)
             url, exe_id = self.get_link(url)
             url = self.url_head + url
-            p = page.get(url)
-            if 200 == p.status_code:
+            p = self.page.get(url, timeout=20)
+            print(url + " exe https status: %s" % p.status_code)
+            if 200 == int(p.status_code):
                 html = etree.HTML(p.text)
                 p.close()
-                exe_url = html.xpath(self.xpath_temp_exe_link)
+                exe_url = html.xpath(self.xpath_temp_exe_link)[0]
                 token = self.get_token(url, exe_id)
                 exe_end = str(exe_url).split('/')[-1]
                 token = token + '/' + exe_end
                 exe_url = self.url_head + str(exe_url).replace(exe_end,token)
-                if exe_url.endswith(".exe"):
-                	self.url_list.append(str(exe_url))
+                # print(exe_url)
+                if exe_url.endswith(".exe") or exe_url.endswith(".zip"):
+                    # outfname = self.dir_path + '/' + exe_id + '.' + exe_url.split('.')[-1]
+                    self.url_list.append(str(exe_url))
+                    cmd = 'wget -P %s %s' % (self.dir_path, exe_url)
+                    subprocess.call(cmd, shell=True)
+                    # wget.download(exe_url,out=outfname)
             else:
                 p.close()
                 continue
@@ -96,12 +110,12 @@ class GetUrl(object):
         return url, exe_id
 
     def get_token(self, url, exe_id):
-        page = requests.session()
         header1['Referer'] = url
-        page.headers = header1
-        token_url = self.get_toekn_head + str(exe_id) + self.get_toekn_end
-        p = page.get(token_url)
+        self.page.headers = header1
+        token_url = self.get_token_head + str(exe_id) + self.get_token_end
+        p = self.page.get(token_url, timeout=20)
         token = str(p.text).split('\'')[1]
+        p.close()
         return str(token)
 
     # 获取分类url列表
@@ -136,6 +150,7 @@ if __name__ == '__main__':
     # page = requests.session()
     # page.headers = header
 
+    # G = GetUrl()
     # url2, exe_id = G.get_link(url3)
     # print(url2, exe_id)
     # url2 = G.url_head + url2
